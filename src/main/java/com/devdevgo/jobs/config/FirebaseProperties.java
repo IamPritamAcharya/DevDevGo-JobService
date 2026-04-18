@@ -14,4 +14,5 @@ public class FirebaseProperties {
     private String credentialsPath = "";
     private String projectId = "";
     private String collectionName = "job_listings";
+    private String metadataCollectionName = "system_metadata";
 }

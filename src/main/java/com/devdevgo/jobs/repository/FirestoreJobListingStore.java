@@ -2,6 +2,7 @@ package com.devdevgo.jobs.repository;
 
 import com.devdevgo.jobs.config.FirebaseProperties;
 import com.devdevgo.jobs.model.JobListing;
+import com.devdevgo.jobs.service.JobListingMatcher;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.Query;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
@@ -33,7 +34,7 @@ public class FirestoreJobListingStore implements JobListingStore {
             return Mono.just(0);
         }
 
-       return Mono.fromCallable(() -> {
+        return Mono.fromCallable(() -> {
                     WriteBatch batch = firestore.batch();
                     String collection = properties.getCollectionName();
                     for (JobListing listing : listings) {
@@ -53,7 +54,7 @@ public class FirestoreJobListingStore implements JobListingStore {
     public Flux<JobListing> findRecent(int limit) {
         return Mono.fromCallable(() -> {
                     List<QueryDocumentSnapshot> docs = firestore.collection(properties.getCollectionName())
-                            .orderBy("fetchedAt", Query.Direction.DESCENDING)
+                            .orderBy("fetchedAtEpochSeconds", Query.Direction.DESCENDING)
                             .limit(limit)
                             .get()
                             .get()
@@ -62,7 +63,9 @@ public class FirestoreJobListingStore implements JobListingStore {
                     List<JobListing> listings = new ArrayList<>(docs.size());
                     for (QueryDocumentSnapshot doc : docs) {
                         JobListing listing = fromMap(doc.getData());
-                        if (listing != null) listings.add(listing);
+                        if (listing != null) {
+                            listings.add(listing);
+                        }
                     }
                     return listings;
                 })
@@ -71,15 +74,24 @@ public class FirestoreJobListingStore implements JobListingStore {
     }
 
     @Override
-    public Mono<Void> deleteOlderThan(String isoInstantThreshold) {
+    public Flux<JobListing> search(String query, String location, List<String> tags, int limit) {
+        return findRecent(Math.max(limit, 500))
+                .filter(listing -> JobListingMatcher.matches(listing, query, location, tags))
+                .take(limit);
+    }
+
+    @Override
+    public Mono<Void> deleteOlderThanCreatedAtEpochSeconds(long epochSecondsThreshold) {
         return Mono.fromCallable(() -> {
                     List<QueryDocumentSnapshot> docs = firestore.collection(properties.getCollectionName())
-                            .whereLessThan("fetchedAt", isoInstantThreshold)
+                            .whereLessThan("createdAtEpochSeconds", epochSecondsThreshold)
                             .get()
                             .get()
                             .getDocuments();
 
-                    if (docs.isEmpty()) return null;
+                    if (docs.isEmpty()) {
+                        return null;
+                    }
 
                     WriteBatch batch = firestore.batch();
                     docs.forEach(doc -> batch.delete(doc.getReference()));
@@ -99,6 +111,7 @@ public class FirestoreJobListingStore implements JobListingStore {
         map.put("description", listing.description());
         map.put("redirectUrl", listing.redirectUrl());
         map.put("createdAt", listing.createdAt());
+        map.put("createdAtEpochSeconds", listing.createdAtEpochSeconds());
         map.put("contractType", listing.contractType());
         map.put("contractTime", listing.contractTime());
         map.put("salaryMin", listing.salaryMin());
@@ -113,13 +126,16 @@ public class FirestoreJobListingStore implements JobListingStore {
         map.put("searchedWhat", listing.searchedWhat());
         map.put("searchedWhere", listing.searchedWhere());
         map.put("fetchedAt", listing.fetchedAt());
+        map.put("fetchedAtEpochSeconds", listing.fetchedAtEpochSeconds());
         map.put("normalizedText", listing.normalizedText());
         map.put("tags", listing.tags());
         return map;
     }
 
     private JobListing fromMap(Map<String, Object> map) {
-        if (map == null || map.isEmpty()) return null;
+        if (map == null || map.isEmpty()) {
+            return null;
+        }
         return new JobListing(
                 asString(map.get("id")),
                 asString(map.get("title")),
@@ -128,6 +144,7 @@ public class FirestoreJobListingStore implements JobListingStore {
                 asString(map.get("description")),
                 asString(map.get("redirectUrl")),
                 asString(map.get("createdAt")),
+                asLong(map.get("createdAtEpochSeconds")),
                 asString(map.get("contractType")),
                 asString(map.get("contractTime")),
                 asDouble(map.get("salaryMin")),
@@ -142,6 +159,7 @@ public class FirestoreJobListingStore implements JobListingStore {
                 asString(map.get("searchedWhat")),
                 asString(map.get("searchedWhere")),
                 asString(map.get("fetchedAt")),
+                asLong(map.get("fetchedAtEpochSeconds")),
                 asString(map.get("normalizedText")),
                 asStringList(map.get("tags"))
         );
@@ -149,6 +167,16 @@ public class FirestoreJobListingStore implements JobListingStore {
 
     private String asString(Object value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private Long asLong(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number number) return number.longValue();
+        try {
+            return Long.parseLong(value.toString());
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private Double asDouble(Object value) {

@@ -5,9 +5,16 @@ import com.devdevgo.jobs.config.FirebaseProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.boot.data.elasticsearch.autoconfigure.DataElasticsearchAutoConfiguration;
+import org.springframework.boot.data.elasticsearch.autoconfigure.DataElasticsearchReactiveRepositoriesAutoConfiguration;
+import org.springframework.boot.data.elasticsearch.autoconfigure.DataElasticsearchRepositoriesAutoConfiguration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-@SpringBootApplication
+@SpringBootApplication(exclude = {
+        DataElasticsearchAutoConfiguration.class,
+        DataElasticsearchReactiveRepositoriesAutoConfiguration.class,
+        DataElasticsearchRepositoriesAutoConfiguration.class
+})
 @EnableScheduling
 @ConfigurationPropertiesScan(basePackageClasses = {AdzunaProperties.class, FirebaseProperties.class})
 public class JobsServiceApplication {
