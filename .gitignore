@@ -1,6 +1,5 @@
 .env
 src/main/resources/firebase/firebase-key.json
-src/main/resources/application.properties
 
 HELP.md
 target/

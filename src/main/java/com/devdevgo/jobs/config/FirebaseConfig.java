@@ -14,8 +14,10 @@ import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Configuration
@@ -26,9 +28,6 @@ public class FirebaseConfig {
 
     @Bean
     public FirebaseApp firebaseApp(FirebaseProperties properties, ResourceLoader resourceLoader) throws IOException {
-        if (properties.getCredentialsPath() == null || properties.getCredentialsPath().isBlank()) {
-            throw new IllegalStateException("firebase.credentials-path is required when firebase.enabled=true");
-        }
 
         if (!FirebaseApp.getApps().isEmpty()) {
             try {
@@ -39,8 +38,25 @@ public class FirebaseConfig {
             }
         }
 
-        Resource resource = resourceLoader.getResource(properties.getCredentialsPath());
-        try (InputStream in = resource.getInputStream()) {
+        // Prefer the env-var JSON (used on Render)
+        String credentialsJson = System.getenv("FIREBASE_CREDENTIALS_JSON");
+        InputStream in;
+        if (credentialsJson != null && !credentialsJson.isBlank()) {
+            log.info("Loading Firebase credentials from FIREBASE_CREDENTIALS_JSON env var");
+            in = new ByteArrayInputStream(credentialsJson.getBytes(StandardCharsets.UTF_8));
+        } else {
+            // Fall back to file path (used locally)
+            String credentialsPath = properties.getCredentialsPath();
+            if (credentialsPath == null || credentialsPath.isBlank()) {
+                throw new IllegalStateException(
+                    "Either FIREBASE_CREDENTIALS_JSON env var or firebase.credentials-path must be set");
+            }
+            log.info("Loading Firebase credentials from path: {}", credentialsPath);
+            Resource resource = resourceLoader.getResource(credentialsPath);
+            in = resource.getInputStream();
+        }
+
+        try (in) {
             GoogleCredentials credentials = GoogleCredentials.fromStream(in);
             FirebaseOptions.Builder builder = FirebaseOptions.builder()
                     .setCredentials(credentials);
