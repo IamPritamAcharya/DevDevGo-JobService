@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
-import java.util.concurrent.TimeoutException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -24,13 +23,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleBadRequest(Exception ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiErrorResponse(Instant.now().toString(), 400, "Bad Request", ex.getMessage(), ""));
-    }
-
-
-    @ExceptionHandler(TimeoutException.class)
-    public ResponseEntity<ApiErrorResponse> handleTimeout(TimeoutException ex) {
-        return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
-                .body(new ApiErrorResponse(Instant.now().toString(), 504, "Gateway Timeout", ex.getMessage(), ""));
     }
 
     @ExceptionHandler(Exception.class)

@@ -15,8 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -36,40 +34,18 @@ public class JobsController {
                 "/api/v1/jobs/ping"));
     }
 
-    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<JobSearchResponse> recent(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return searchService.search(null, null, List.of(), Math.max(page, 1), Math.max(size, 1));
-    }
-
     @GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
     public Mono<JobSearchResponse> search(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String location,
             @RequestParam(required = false) List<String> tag,
-            @RequestParam(required = false) List<String> tags,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
-
-        LinkedHashSet<String> mergedTags = new LinkedHashSet<>();
-        if (tag != null) {
-            mergedTags.addAll(tag);
-        }
-        if (tags != null) {
-            mergedTags.addAll(tags);
-        }
-
-        return searchService.search(q, location, new ArrayList<>(mergedTags), Math.max(page, 1), Math.max(size, 1));
+        return searchService.search(q, location, tag, Math.max(page, 1), Math.max(size, 1));
     }
 
     @PostMapping(value = "/sync", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<SyncReport> sync(
-            @RequestParam(defaultValue = "8") int batchSize,
-            @RequestParam(defaultValue = "false") boolean force) {
-        int safeBatchSize = Math.max(batchSize, 1);
-        return force
-                ? syncService.forceSync(safeBatchSize)
-                : syncService.syncIfDue(safeBatchSize);
+    public Mono<SyncReport> sync(@RequestParam(defaultValue = "2") int batchSize) {
+        return syncService.syncNextBatch(Math.max(batchSize, 1));
     }
 }

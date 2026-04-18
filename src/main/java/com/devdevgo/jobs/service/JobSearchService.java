@@ -36,27 +36,76 @@ public class JobSearchService {
                 ? List.of()
                 : tags.stream()
                         .map(this::normalize)
-                        .filter(tag -> tag != null && !tag.isBlank())
                         .toList();
 
-        return store.search(query, loc, normalizedTags, recentLimit)
+        return store.findRecent(recentLimit)
+                .filter(job -> matches(job, query, loc, normalizedTags))
                 .collectList()
                 .map(all -> {
                     all.sort(Comparator.comparing(
-                            JobListing::fetchedAtEpochSeconds,
-                            Comparator.nullsLast(Long::compareTo)).reversed());
+                            JobListing::fetchedAt,
+                            Comparator.nullsLast(String::compareTo)).reversed());
 
                     return paginate(all, page, size);
                 });
     }
 
     private JobSearchResponse paginate(List<JobListing> all, int page, int size) {
-        int from = Math.min(Math.max((page - 1) * size, 0), all.size());
+        int from = Math.min((page - 1) * size, all.size());
         int to = Math.min(from + size, all.size());
         return new JobSearchResponse(all.size(), page, size, all.subList(from, to));
     }
 
+    private boolean matches(JobListing job,
+            String query,
+            String location,
+            List<String> tags) {
+
+        if (query != null && !query.isBlank()
+                && !containsAllTokens(job.normalizedText(), query)) {
+            return false;
+        }
+
+        if (location != null && !location.isBlank()) {
+            String haystack = (safe(job.location()) + " " + safe(job.searchedWhere()))
+                    .toLowerCase(Locale.ROOT);
+
+            if (!haystack.contains(location))
+                return false;
+        }
+
+        if (tags != null && !tags.isEmpty()) {
+            List<String> jobTags = job.tags() == null ? List.of() : job.tags();
+
+            boolean matchesAll = tags.stream().allMatch(filterTag -> jobTags.stream()
+                    .anyMatch(jobTag -> jobTag.equalsIgnoreCase(filterTag)));
+
+            if (!matchesAll)
+                return false;
+        }
+
+        return true;
+    }
+
+    private boolean containsAllTokens(String text, String query) {
+        if (text == null || text.isBlank())
+            return false;
+
+        String normalizedText = text.toLowerCase(Locale.ROOT);
+
+        for (String token : query.split("\\s+")) {
+            if (!token.isBlank() && !normalizedText.contains(token)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private String normalize(String value) {
         return value == null ? null : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value;
     }
 }

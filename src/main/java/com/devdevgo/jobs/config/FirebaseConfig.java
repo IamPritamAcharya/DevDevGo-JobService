@@ -32,7 +32,8 @@ public class FirebaseConfig {
         Resource resource = resourceLoader.getResource(properties.getCredentialsPath());
         try (InputStream in = resource.getInputStream()) {
             GoogleCredentials credentials = GoogleCredentials.fromStream(in);
-            FirebaseOptions.Builder builder = FirebaseOptions.builder().setCredentials(credentials);
+            FirebaseOptions.Builder builder = FirebaseOptions.builder()
+                    .setCredentials(credentials);
             if (properties.getProjectId() != null && !properties.getProjectId().isBlank()) {
                 builder.setProjectId(properties.getProjectId());
             }

@@ -12,7 +12,5 @@ public interface JobListingStore {
 
     Flux<JobListing> findRecent(int limit);
 
-    Flux<JobListing> search(String query, String location, List<String> tags, int limit);
-
-    Mono<Void> deleteOlderThanCreatedAtEpochSeconds(long epochSecondsThreshold);
+    Mono<Void> deleteOlderThan(String isoInstantThreshold);
 }

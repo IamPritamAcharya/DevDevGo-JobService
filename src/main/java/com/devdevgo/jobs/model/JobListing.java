@@ -10,7 +10,6 @@ public record JobListing(
         String description,
         String redirectUrl,
         String createdAt,
-        Long createdAtEpochSeconds,
         String contractType,
         String contractTime,
         Double salaryMin,
@@ -25,7 +24,6 @@ public record JobListing(
         String searchedWhat,
         String searchedWhere,
         String fetchedAt,
-        Long fetchedAtEpochSeconds,
         String normalizedText,
         List<String> tags
 ) {
