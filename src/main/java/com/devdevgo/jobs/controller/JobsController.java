@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.util.List;
 
 @RequiredArgsConstructor
 @RestController
@@ -30,18 +31,16 @@ public class JobsController {
                 Instant.now().toString(),
                 200,
                 "devdevgo jobs service is running",
-                "/api/v1/jobs/ping"
-        ));
+                "/api/v1/jobs/ping"));
     }
 
     @GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
     public Mono<JobSearchResponse> search(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String location,
-            @RequestParam(required = false) String tag,
+            @RequestParam(required = false) List<String> tag,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
+            @RequestParam(defaultValue = "10") int size) {
         return searchService.search(q, location, tag, Math.max(page, 1), Math.max(size, 1));
     }
 

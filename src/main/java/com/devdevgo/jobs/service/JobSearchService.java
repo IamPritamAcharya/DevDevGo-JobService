@@ -17,21 +17,35 @@ public class JobSearchService {
     private final JobListingStore store;
     private final int recentLimit;
 
-    public JobSearchService(JobListingStore store, @Value("${jobs.search.recent-limit:500}") int recentLimit) {
+    public JobSearchService(JobListingStore store,
+            @Value("${jobs.search.recent-limit:500}") int recentLimit) {
         this.store = store;
         this.recentLimit = recentLimit;
     }
 
-    public Mono<JobSearchResponse> search(String q, String location, String tag, int page, int size) {
+    public Mono<JobSearchResponse> search(String q,
+            String location,
+            List<String> tags,
+            int page,
+            int size) {
+
         final String query = normalize(q);
         final String loc = normalize(location);
-        final String tg = normalize(tag);
+
+        final List<String> normalizedTags = tags == null
+                ? List.of()
+                : tags.stream()
+                        .map(this::normalize)
+                        .toList();
 
         return store.findRecent(recentLimit)
-                .filter(job -> matches(job, query, loc, tg))
+                .filter(job -> matches(job, query, loc, normalizedTags))
                 .collectList()
                 .map(all -> {
-                    all.sort(Comparator.comparing(JobListing::fetchedAt, Comparator.nullsLast(String::compareTo)).reversed());
+                    all.sort(Comparator.comparing(
+                            JobListing::fetchedAt,
+                            Comparator.nullsLast(String::compareTo)).reversed());
+
                     return paginate(all, page, size);
                 });
     }
@@ -42,26 +56,47 @@ public class JobSearchService {
         return new JobSearchResponse(all.size(), page, size, all.subList(from, to));
     }
 
-    private boolean matches(JobListing job, String query, String location, String tag) {
-        if (query != null && !query.isBlank() && !containsAllTokens(job.normalizedText(), query)) {
+    private boolean matches(JobListing job,
+            String query,
+            String location,
+            List<String> tags) {
+
+        if (query != null && !query.isBlank()
+                && !containsAllTokens(job.normalizedText(), query)) {
             return false;
         }
+
         if (location != null && !location.isBlank()) {
-            String haystack = (safe(job.location()) + " " + safe(job.searchedWhere())).toLowerCase(Locale.ROOT);
-            if (!haystack.contains(location)) return false;
+            String haystack = (safe(job.location()) + " " + safe(job.searchedWhere()))
+                    .toLowerCase(Locale.ROOT);
+
+            if (!haystack.contains(location))
+                return false;
         }
-        if (tag != null && !tag.isBlank()) {
-            List<String> tags = job.tags() == null ? List.of() : job.tags();
-            if (tags.stream().noneMatch(t -> t.toLowerCase(Locale.ROOT).contains(tag))) return false;
+
+        if (tags != null && !tags.isEmpty()) {
+            List<String> jobTags = job.tags() == null ? List.of() : job.tags();
+
+            boolean matchesAll = tags.stream().allMatch(filterTag -> jobTags.stream()
+                    .anyMatch(jobTag -> jobTag.equalsIgnoreCase(filterTag)));
+
+            if (!matchesAll)
+                return false;
         }
+
         return true;
     }
 
     private boolean containsAllTokens(String text, String query) {
-        if (text == null || text.isBlank()) return false;
+        if (text == null || text.isBlank())
+            return false;
+
         String normalizedText = text.toLowerCase(Locale.ROOT);
+
         for (String token : query.split("\\s+")) {
-            if (!token.isBlank() && !normalizedText.contains(token)) return false;
+            if (!token.isBlank() && !normalizedText.contains(token)) {
+                return false;
+            }
         }
         return true;
     }
