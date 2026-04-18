@@ -11,5 +11,4 @@ public record SyncReport(
         String startedAt,
         String finishedAt,
         String note
-) {
-}
+) {}

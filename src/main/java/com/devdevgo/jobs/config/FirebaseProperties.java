@@ -14,4 +14,7 @@ public class FirebaseProperties {
     private String credentialsPath = "";
     private String projectId = "";
     private String collectionName = "job_listings";
+
+    /** Stores system metadata such as sync_state (cursor persistence for Render restarts). */
+    private String metadataCollectionName = "system_metadata";
 }

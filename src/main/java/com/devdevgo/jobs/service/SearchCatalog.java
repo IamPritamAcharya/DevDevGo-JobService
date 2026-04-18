@@ -7,6 +7,17 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
+/**
+ * Catalog of all search profiles.
+ *
+ * Rate-limit maths (Adzuna free tier):
+ *   250 req/day  →  250 / 24h ≈ 10 req/h  (hard ceiling)
+ *   Batch size 8 → 8 req/h → 192 req/day  (safe buffer, ~77% of daily quota)
+ *
+ * With 10 results per profile that's 80 new listings written to Firestore every hour.
+ * The cursor advances by batchSize each run and wraps around, so all 24 profiles
+ * are covered in a 3-hour window.
+ */
 @Component
 public class SearchCatalog {
 
@@ -43,11 +54,25 @@ public class SearchCatalog {
         return profiles;
     }
 
+    public int size() {
+        return profiles.size();
+    }
+
+    /** Advance the in-memory cursor and return the next {@code batchSize} profiles (wraps). */
     public List<SearchProfile> nextBatch(int batchSize) {
         if (profiles.isEmpty() || batchSize <= 0) return List.of();
         int start = Math.floorMod(cursor.getAndAdd(batchSize), profiles.size());
         return IntStream.range(0, batchSize)
                 .mapToObj(i -> profiles.get((start + i) % profiles.size()))
                 .toList();
+    }
+
+    /** Restore the cursor to a specific position (called on startup from persisted state). */
+    public void setCursor(int position) {
+        cursor.set(Math.floorMod(position, Math.max(profiles.size(), 1)));
+    }
+
+    public int getCursor() {
+        return cursor.get();
     }
 }

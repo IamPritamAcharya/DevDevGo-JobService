@@ -5,6 +5,8 @@ import com.google.cloud.firestore.Firestore;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.cloud.FirestoreClient;
+import jakarta.annotation.PreDestroy;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,9 +17,12 @@ import org.springframework.core.io.ResourceLoader;
 import java.io.IOException;
 import java.io.InputStream;
 
+@Slf4j
 @Configuration
 @ConditionalOnProperty(prefix = "firebase", name = "enabled", havingValue = "true")
 public class FirebaseConfig {
+
+    private FirebaseApp app;
 
     @Bean
     public FirebaseApp firebaseApp(FirebaseProperties properties, ResourceLoader resourceLoader) throws IOException {
@@ -26,7 +31,12 @@ public class FirebaseConfig {
         }
 
         if (!FirebaseApp.getApps().isEmpty()) {
-            return FirebaseApp.getInstance();
+            try {
+                FirebaseApp.getInstance().delete();
+                log.info("Deleted stale FirebaseApp instance (hot-reload)");
+            } catch (Exception e) {
+                log.warn("Could not delete existing FirebaseApp: {}", e.getMessage());
+            }
         }
 
         Resource resource = resourceLoader.getResource(properties.getCredentialsPath());
@@ -37,7 +47,9 @@ public class FirebaseConfig {
             if (properties.getProjectId() != null && !properties.getProjectId().isBlank()) {
                 builder.setProjectId(properties.getProjectId());
             }
-            return FirebaseApp.initializeApp(builder.build());
+            app = FirebaseApp.initializeApp(builder.build());
+            log.info("FirebaseApp initialized (project={})", properties.getProjectId());
+            return app;
         }
     }
 
@@ -45,5 +57,17 @@ public class FirebaseConfig {
     @DependsOn("firebaseApp")
     public Firestore firestore(FirebaseApp firebaseApp) {
         return FirestoreClient.getFirestore(firebaseApp);
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        if (app != null) {
+            try {
+                app.delete();
+                log.info("FirebaseApp deleted on context shutdown");
+            } catch (Exception e) {
+                log.warn("Error deleting FirebaseApp on shutdown: {}", e.getMessage());
+            }
+        }
     }
 }
