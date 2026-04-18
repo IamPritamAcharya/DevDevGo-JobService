@@ -1,23 +1,18 @@
 package com.devdevgo.jobs;
 
-import io.github.cdimascio.dotenv.Dotenv;
 import com.devdevgo.jobs.config.AdzunaProperties;
+import com.devdevgo.jobs.config.FirebaseProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@ConfigurationPropertiesScan(basePackageClasses = AdzunaProperties.class)
+@EnableScheduling
+@ConfigurationPropertiesScan(basePackageClasses = {AdzunaProperties.class, FirebaseProperties.class})
 public class JobsServiceApplication {
 
-	public static void main(String[] args) {
-
-		Dotenv dotenv = Dotenv.configure()
-				.ignoreIfMissing()
-				.load();
-
-		dotenv.entries().forEach(entry -> System.setProperty(entry.getKey(), entry.getValue()));
-
-		SpringApplication.run(JobsServiceApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(JobsServiceApplication.class, args);
+    }
 }
